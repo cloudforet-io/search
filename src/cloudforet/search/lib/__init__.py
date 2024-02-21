@@ -1,0 +1,1 @@
+from cloudforet.search.lib.pymongo_client import SpaceONEPymongoClient
