@@ -1,0 +1,1 @@
+from cloudforet.search.manager.identity_manager import IdentityManager

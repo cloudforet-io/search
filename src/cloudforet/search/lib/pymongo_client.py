@@ -7,24 +7,27 @@ from pymongo import MongoClient
 _LOGGER = logging.getLogger(__name__)
 
 
-class SpaceONEPymongoClient(object):
+class SpaceONEPymongoClient:
     _client = None
     prefix = None
+    config = None
 
     def __new__(cls, *args, **kwargs):
         if not cls._client:
-            search_database = config.get_global("SEARCH_DATABASE").get("default")
-            username = urllib.parse.quote_plus(search_database.get("username"))
-            password = urllib.parse.quote_plus(search_database.get("password"))
-            protocol, host = search_database.get("host").split("://")
+            cls.config = config.get_global("PYMONGO_DATABASES")
+            pymongo_config = cls.config.get("common")
+            username = pymongo_config.get("username")
+            password = pymongo_config.get("password")
+            protocol, host = pymongo_config.get("host").split("://")
 
             cls._client = MongoClient(f"{protocol}://{username}:{password}@{host}")
-            if prefix := search_database.get("prefix"):
+            if prefix := pymongo_config.get("db_prefix"):
                 cls.prefix = prefix
 
             _LOGGER.debug(f"[__new__] Create pymongo client prefix: {cls.prefix}")
         return cls._client
 
+    # property
     @classmethod
     def get_client(cls):
         return cls._client

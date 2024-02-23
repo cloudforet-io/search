@@ -12,11 +12,13 @@ _LOGGER = logging.getLogger(__name__)
 class IdentityManager(BaseManager):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        token = self.transaction.get_meta("token")
-        self.token_type = JWTUtil.get_value_from_token(token, "typ")
         self.identity_conn: SpaceConnector = self.locator.get_connector(
             SpaceConnector, service="identity"
         )
+
+    @cache.cacheable("search:workspaces:{domain_id}:{user_id}", expire=300)
+    def get_workspaces(self, domain_id: str, user_id: str) -> dict:
+        return self.identity_conn.dispatch("UserProfile.get_workspaces")
 
     def check_workspace(self, workspace_id: str, domain_id: str) -> None:
         system_token = config.get_global("TOKEN")
@@ -26,93 +28,6 @@ class IdentityManager(BaseManager):
             {"workspace_id": workspace_id, "domain_id": domain_id},
             token=system_token,
         )
-
-    def list_workspaces(self, params: dict, domain_id: str) -> dict:
-        if self.token_type == "SYSTEM_TOKEN":
-            return self.identity_conn.dispatch(
-                "Workspace.list", params, x_domain_id=domain_id
-            )
-        else:
-            return self.identity_conn.dispatch("Workspace.list", params)
-
-    def list_workspace_users(self, params: dict, domain_id: str) -> dict:
-        if self.token_type == "SYSTEM_TOKEN":
-            return self.identity_conn.dispatch(
-                "WorkspaceUser.list", params, x_domain_id=domain_id
-            )
-        else:
-            return self.identity_conn.dispatch("WorkspaceUser.list", params)
-
-    def list_service_accounts(self, query: dict, domain_id: str) -> dict:
-        if self.token_type == "SYSTEM_TOKEN":
-            return self.identity_conn.dispatch(
-                "ServiceAccount.list", {"query": query}, x_domain_id=domain_id
-            )
-        else:
-            return self.identity_conn.dispatch("ServiceAccount.list", {"query": query})
-
-    @cache.cacheable(
-        key="cost-analysis:project-name:{domain_id}:{workspace_id}:{project_id}",
-        expire=300,
-    )
-    def get_project_name(self, project_id: str, workspace_id: str, domain_id: str):
-        try:
-            project_info = self.get_project(project_id, domain_id)
-            return project_info["name"]
-        except Exception as e:
-            _LOGGER.error(f"[get_project_name] API Error: {e}")
-            return project_id
-
-    def get_project(self, project_id: str, domain_id: str):
-        if self.token_type == "SYSTEM_TOKEN":
-            return self.identity_conn.dispatch(
-                "Project.get", {"project_id": project_id}, x_domain_id=domain_id
-            )
-        else:
-            return self.identity_conn.dispatch(
-                "Project.get", {"project_id": project_id}
-            )
-
-    def list_projects(self, params: dict, domain_id):
-        if self.token_type == "SYSTEM_TOKEN":
-            return self.identity_conn.dispatch(
-                "Project.list", params, x_domain_id=domain_id
-            )
-        else:
-            return self.identity_conn.dispatch("Project.list", params)
-
-    def list_project_groups(self, params: dict, domain_id: str) -> dict:
-        if self.token_type == "SYSTEM_TOKEN":
-            return self.identity_conn.dispatch(
-                "ProjectGroup.list", params, x_domain_id=domain_id
-            )
-        else:
-            return self.identity_conn.dispatch("ProjectGroup.list", params)
-
-    @cache.cacheable(key="cost-analysis:projects-in-pg:{project_group_id}", expire=300)
-    def get_projects_in_project_group(self, project_group_id: str, domain_id: str):
-        params = {
-            "query": {
-                "only": ["project_id"],
-            },
-            "project_group_id": project_group_id,
-            "include_children": True,
-        }
-
-        if self.token_type == "SYSTEM_TOKEN":
-            return self.identity_conn.dispatch(
-                "Project.list", params, x_domain_id=domain_id
-            )
-        else:
-            return self.identity_conn.dispatch("Project.list", params)
-
-    def list_role_bindings(self, params: dict, domain_id: str) -> dict:
-        if self.token_type == "SYSTEM_TOKEN":
-            return self.identity_conn.dispatch(
-                "RoleBinding.list", params, x_domain_id=domain_id
-            )
-        else:
-            return self.identity_conn.dispatch("RoleBinding.list", params)
 
     def grant_token(
         self,

@@ -1,14 +1,15 @@
 # Search Database Settings
-SEARCH_DATABASE = {
-    "default": {
-        # 'db': '',
-        # 'host': '',
-        # 'port': 0,
-        # 'username': '',
-        # 'password': '',
-        # 'ssl': False,
-        # 'ssl_ca_certs': ''
-    }
+# pymongo database
+PYMONGO_DATABASES = {
+    "common": {
+        "db_prefix": "dev2",
+        "username": "cloudforet",
+        "password": "password1234",
+        "host": "mongodb://localhost:27017",
+    },
+    "identity": {
+        "db": "identity",
+    },
 }
 
 # Cache Settings
