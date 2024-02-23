@@ -1,5 +1,4 @@
-# Search Database Settings
-# pymongo database
+# Pymongo Databases Settings
 PYMONGO_DATABASES = {
     "common": {
         "db_prefix": "dev2",
