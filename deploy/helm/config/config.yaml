@@ -1,17 +1,17 @@
 REMOTE_URL:
-  - file:///opt/spaceone/identity/config/database.yaml
-  - file:///opt/spaceone/identity/config/shared.yaml
-  - file:///opt/spaceone/identity/config/application.yaml
+  - file:///opt/spaceone/search/config/database.yaml
+  - file:///opt/spaceone/search/config/shared.yaml
+  - file:///opt/spaceone/search/config/application.yaml
 GLOBAL:
   MAX_WORKERS: 1000
   DATABASES:
     default:
-      db: identity
+      db: search
       host: mongodb
       port: 27017
       maxPoolSize: 200
-      username: identity_user
-      password: identity_password
+      username: search_user
+      password: search_password
   CACHES:
     default:
       backend: spaceone.core.cache.redis_cache.RedisCache
@@ -29,4 +29,4 @@ GLOBAL:
     handlers:
       file:
         type: file
-        filename: /var/log/spaceone/identity.log
+        filename: /var/log/spaceone/search.log
