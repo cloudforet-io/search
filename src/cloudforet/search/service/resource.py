@@ -60,7 +60,7 @@ class ResourceService(BaseService):
         page = 0
 
         workspace_project_map = {}
-        query_filter = {}
+        query_filter = {"domain_id": domain_id, "$or": []}
 
         if next_token:
             next_token = self._decode_next_token(resource_type, next_token)
@@ -87,7 +87,6 @@ class ResourceService(BaseService):
                         )
                         workspace_project_map[workspace_id] = user_projects
 
-            query_filter.update({"domain_id": domain_id, "$or": []})
             if workspace_project_map:
                 for workspace_id, user_projects in workspace_project_map.items():
                     query_filter["$or"].append(
