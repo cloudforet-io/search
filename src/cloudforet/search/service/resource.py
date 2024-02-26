@@ -56,13 +56,15 @@ class ResourceService(BaseService):
         role_type = self.transaction.meta.get("authorization.role_type")
 
         domain_id = params.domain_id
-        workspaces = [params.workspace_id] if params.workspace_id else []
+        workspaces = self._get_accessible_workspaces(
+            domain_id, user_id, params.workspaces, params.all_workspaces
+        )
         resource_type = params.resource_type
         next_token = params.next_token
         page = 0
 
         workspace_project_map = {}
-        query_filter = {"domain_id": domain_id, "$or": []}
+        query_filter = {"$and": [{"domain_id": domain_id}]}
 
         if next_token:
             next_token = self._decode_next_token(resource_type, next_token)
@@ -71,43 +73,38 @@ class ResourceService(BaseService):
             page = next_token.get("page")
 
         elif owner_type == "USER":
-            identity_mgr: IdentityManager = self.locator.get_manager("IdentityManager")
             if role_type != "DOMAIN_ADMIN":
-                workspaces_info = identity_mgr.get_workspaces(domain_id, user_id)
-                workspace_ids = [
-                    info["workspace_id"] for info in workspaces_info.get("results", [])
-                ]
-
                 if params.all_workspaces:
-                    workspaces = workspace_ids
+                    workspaces = self._get_all_workspace_ids(domain_id, user_id)
                 elif workspaces:
-                    # check is accessible workspace with params.workspaces
-                    workspaces = list(set(workspaces) & set(workspace_ids))
                     for workspace_id in workspaces:
                         user_projects = self._get_all_projects(
                             domain_id, workspace_id, user_id
                         )
                         workspace_project_map[workspace_id] = user_projects
 
-            if workspace_project_map:
-                for workspace_id, user_projects in workspace_project_map.items():
-                    query_filter["$or"].append(
-                        {
-                            "workspace_id": workspace_id,
-                            "project_id": {"$in": user_projects},
-                        }
-                    )
-            elif workspaces:
-                query_filter["workspace_id"] = {"$in": workspaces}
-
-            if params.user_projects:
-                query_filter["project_id]"] = {"$in": params.user_projects}
+        if workspace_project_map:
+            or_filter = {"$or": []}
+            for workspace_id, user_projects in workspace_project_map.items():
+                or_filter["$or"].append(
+                    {
+                        "workspace_id": workspace_id,
+                        "project_id": {"$in": user_projects},
+                    }
+                )
+                query_filter["$and"].append(or_filter)
+        elif workspaces:
+            query_filter["$and"].append({"workspace_id": {"$in": workspaces}})
+        elif params.workspace_id:
+            query_filter["$and"].append({"workspace_id": params.workspace_id})
 
         regex_pattern = re.compile(params.keyword, re.IGNORECASE)
 
         if search_target := self.search_conf.get(resource_type):
+            or_filter = {"$or": []}
             for keyword in search_target["request"]["search"]:
-                query_filter["$or"].append({keyword: {"$regex": regex_pattern}})
+                or_filter["$or"].append({keyword: {"$regex": regex_pattern}})
+            query_filter["$and"].append(or_filter)
         else:
             raise ERROR_INVALID_PARAMETER(key="resource_type")
 
@@ -122,6 +119,14 @@ class ResourceService(BaseService):
         response = self._make_response(results, next_token, search_target["response"])
 
         return ResourcesResponse(**response)
+
+    def _get_all_workspace_ids(self, domain_id: str, user_id: str) -> list:
+        identity_mgr: IdentityManager = self.locator.get_manager("IdentityManager")
+        workspaces_info = identity_mgr.get_workspaces(domain_id, user_id)
+        workspace_ids = [
+            info["workspace_id"] for info in workspaces_info.get("results", [])
+        ]
+        return workspace_ids
 
     def _get_all_projects(
         self, domain_id: str, workspace_id: str, user_id: str = None
@@ -147,11 +152,28 @@ class ResourceService(BaseService):
 
         return user_projects
 
+    def _get_accessible_workspaces(
+        self,
+        domain_id: str,
+        user_id: str,
+        workspaces: Union[list, None],
+        all_workspaces: Union[bool, None],
+    ) -> list:
+        if not all_workspaces or not workspaces:
+            return []
+
+        # check is accessible workspace with params.workspaces
+        workspace_ids = self._get_all_workspace_ids(domain_id, user_id)
+        workspaces = list(set(workspaces) & set(workspace_ids))
+
+        return workspaces
+
     @staticmethod
     def _make_response(results: list, next_token: str, response_conf) -> dict:
         response_format = response_conf["name"]
         for result in results:
             result["name"] = response_format.format(**result)
+            result["resource_id"] = result[response_conf["resource_id"]]
 
         return {
             "results": results,
