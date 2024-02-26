@@ -108,6 +108,10 @@ class ResourceService(BaseService):
         else:
             raise ERROR_INVALID_PARAMETER(key="resource_type")
 
+        query_filter = self._make_query_filter_by_resource_type(
+            resource_type, query_filter
+        )
+        print(query_filter, "query_filter")
         results = self.resource_manager.search_resource(
             domain_id, query_filter, resource_type, params.limit, page
         )
@@ -167,6 +171,14 @@ class ResourceService(BaseService):
         workspaces = list(set(workspaces) & set(workspace_ids))
 
         return workspaces
+
+    @staticmethod
+    def _make_query_filter_by_resource_type(
+        resource_type: str, query_filter: dict
+    ) -> dict:
+        if resource_type == "identity.Workspace":
+            query_filter["$and"].append({"state": "ENABLED"})
+        return query_filter
 
     @staticmethod
     def _make_response(results: list, next_token: str, response_conf) -> dict:
