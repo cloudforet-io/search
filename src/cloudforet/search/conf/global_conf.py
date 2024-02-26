@@ -11,6 +11,14 @@ PYMONGO_DATABASES = {
     },
 }
 
+DATABASES = {
+    "default": {
+        "username": "cloudforet",
+        "password": "password1234",
+        "host": "mongodb://localhost:27017",
+    }
+}
+
 # Cache Settings
 CACHES = {
     "default": {},

@@ -79,11 +79,11 @@ class ResourceManager(BaseManager):
 
     def _get_collection_and_db_name(self, resource_type: str) -> Tuple[str, str]:
         service, resource = resource_type.split(".")
-        db_info = SpaceONEPymongoClient.config.get(service.lower())
 
         collection_name = self._pascal_to_snake_case(resource)
+        db_name = service.lower()
         if prefix := SpaceONEPymongoClient.prefix:
-            db_name = f"{prefix}{db_info['db']}"
+            db_name = f"{prefix}{db_name}"
         else:
             db_name = service
 
