@@ -17,25 +17,38 @@ class ResourceManager(BaseManager):
         self.client = SpaceONEPymongoClient()
 
     def search_resource(
-        self, query_filter: dict, resource_type: str, limit: int, page: int
+        self,
+        domain_id: str,
+        query_filter: dict,
+        resource_type: str,
+        limit: int,
+        page: int,
     ) -> list:
         db_name, collection_name = self._get_collection_and_db_name(resource_type)
         skip_count = page * limit
 
-        result = list(
+        results = list(
             self.client[db_name][collection_name].find(
                 filter=query_filter, limit=limit, skip=skip_count
             )
         )
+
+        if resource_type == "identity.Project":
+            project_group_ids = [result.get("project_group_id") for result in results]
+            project_group_map = self.get_project_group_map(domain_id, project_group_ids)
+            for result in results:
+                if pg_id := result.get("project_group_id"):
+                    _name = result.get("name")
+                    result["name"] = f"{project_group_map.get(pg_id)} > {_name}"
+
         _LOGGER.debug(f"[search] query_filter: {query_filter}")
 
-        return result
+        return results
 
     def list_public_project(self, domain_id: str, workspace_id: str) -> list:
         db_name, collection_name = self._get_collection_and_db_name("identity.Project")
-        print(db_name, collection_name)
         response = list(
-            self.client["dev2-identity"].project.find(
+            self.client[db_name][collection_name].find(
                 {
                     "domain_id": domain_id,
                     "project_type": "PUBLIC",
@@ -43,7 +56,6 @@ class ResourceManager(BaseManager):
                 }
             )
         )
-        print(response)
         return response
 
     def list_private_project(
@@ -63,8 +75,6 @@ class ResourceManager(BaseManager):
                 }
             )
         )
-        print("list_private_project")
-        print(response)
         return response
 
     def _get_collection_and_db_name(self, resource_type: str) -> Tuple[str, str]:
@@ -78,6 +88,22 @@ class ResourceManager(BaseManager):
             db_name = service
 
         return db_name, collection_name
+
+    def get_project_group_map(self, domain_id: str, project_group_ids: list) -> dict:
+        db_name, collection_name = self._get_collection_and_db_name(
+            "identity.ProjectGroup"
+        )
+        response = list(
+            self.client[db_name][collection_name].find(
+                {
+                    "domain_id": domain_id,
+                    "project_group_id": {"$in": project_group_ids},
+                }
+            )
+        )
+        project_group_map = {pg["project_group_id"]: pg["name"] for pg in response}
+
+        return project_group_map
 
     @staticmethod
     def _pascal_to_snake_case(pascal_case: str):

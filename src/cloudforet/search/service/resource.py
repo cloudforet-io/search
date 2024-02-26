@@ -2,6 +2,7 @@ import base64
 import logging
 import re
 
+from spaceone.core import config
 from spaceone.core.error import *
 from spaceone.core.service import *
 from spaceone.core.service.utils import *
@@ -23,6 +24,7 @@ class ResourceService(BaseService):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.search_conf = self._get_search_conf()
         self.resource_manager = ResourceManager()
 
     @transaction(
@@ -103,22 +105,21 @@ class ResourceService(BaseService):
 
         regex_pattern = re.compile(params.keyword, re.IGNORECASE)
 
-        if params.resource_type == "identity.ServiceAccount":
-            query_filter["$or"].append({"name": {"$regex": regex_pattern}})
-            query_filter["$or"].append({"provider": {"$regex": regex_pattern}})
+        if search_target := self.search_conf.get(resource_type):
+            for keyword in search_target["request"]["search"]:
+                query_filter["$or"].append({keyword: {"$regex": regex_pattern}})
+        else:
+            raise ERROR_INVALID_PARAMETER(key="resource_type")
 
-        result = self.resource_manager.search_resource(
-            query_filter, resource_type, params.limit, page
+        results = self.resource_manager.search_resource(
+            domain_id, query_filter, resource_type, params.limit, page
         )
 
         next_token = self._encode_next_token_base64(
-            result, resource_type, query_filter, params.limit, page
+            results, resource_type, query_filter, params.limit, page
         )
 
-        response = {
-            "results": result,
-            "next_token": next_token,
-        }
+        response = self._make_response(results, next_token, search_target["response"])
 
         return ResourcesResponse(**response)
 
@@ -147,14 +148,25 @@ class ResourceService(BaseService):
         return user_projects
 
     @staticmethod
+    def _make_response(results: list, next_token: str, response_conf) -> dict:
+        response_format = response_conf["name"]
+        for result in results:
+            result["name"] = response_format.format(**result)
+
+        return {
+            "results": results,
+            "next_token": next_token,
+        }
+
+    @staticmethod
     def _encode_next_token_base64(
-        result: list,
+        results: list,
         resource_type: str,
         query_filter: dict,
         limit: int,
         page: int,
     ) -> Union[str, None]:
-        if limit == 0 or len(result) != limit:
+        if limit == 0 or len(results) != limit:
             return None
 
         next_token = {
@@ -173,3 +185,11 @@ class ResourceService(BaseService):
         if next_token.get("resource_type") != resource_type:
             raise ERROR_INVALID_PARAMETER(key="resource_type")
         return next_token
+
+    @staticmethod
+    def _get_search_conf() -> dict:
+        package = config.get_package()
+        search_conf_module = __import__(
+            f"{package}.conf.search_conf", fromlist=["search_conf"]
+        )
+        return getattr(search_conf_module, "RESOURCE_TYPES", [])
