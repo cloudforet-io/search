@@ -11,7 +11,14 @@ RESOURCE_TYPES = {
         "response": {"resource_id": "project_id", "name": "{name}"},
     },
     "identity.Workspace": {
-        "request": {"search": ["name"]},
+        "request": {"search": ["name"], "filter": [{"state": "ENABLED"}]},
         "response": {"resource_id": "workspace_id", "name": "{name}"},
+    },
+    "inventory.CloudServiceType": {
+        "request": {"search": ["name", "group", "provider"]},
+        "response": {
+            "resource_id": "cloud_service_type_id",
+            "name": "{group} > {name}",
+        },
     },
 }

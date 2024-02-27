@@ -2,6 +2,7 @@ import logging
 import re
 from typing import Tuple
 
+from spaceone.core import cache
 from spaceone.core.manager import BaseManager
 
 from cloudforet.search.lib.pymongo_client import SpaceONEPymongoClient
@@ -19,7 +20,7 @@ class ResourceManager(BaseManager):
     def search_resource(
         self,
         domain_id: str,
-        query_filter: dict,
+        find_filter: dict,
         resource_type: str,
         limit: int,
         page: int,
@@ -29,7 +30,7 @@ class ResourceManager(BaseManager):
 
         results = list(
             self.client[db_name][collection_name].find(
-                filter=query_filter, limit=limit, skip=skip_count
+                filter=find_filter, limit=limit, skip=skip_count
             )
         )
 
@@ -41,7 +42,10 @@ class ResourceManager(BaseManager):
                     _name = result.get("name")
                     result["name"] = f"{project_group_map.get(pg_id)} > {_name}"
 
-        _LOGGER.debug(f"[search] query_filter: {query_filter}")
+        _LOGGER.debug(f"[search] find_filter: {find_filter}")
+        print(
+            f"[search] find_filter: {find_filter}"
+        )  # todo: need to remove temporary debug code
 
         return results
 
@@ -77,18 +81,11 @@ class ResourceManager(BaseManager):
         )
         return response
 
-    def _get_collection_and_db_name(self, resource_type: str) -> Tuple[str, str]:
-        service, resource = resource_type.split(".")
-
-        collection_name = self._pascal_to_snake_case(resource)
-        db_name = service.lower()
-        if prefix := SpaceONEPymongoClient.prefix:
-            db_name = f"{prefix}{db_name}"
-        else:
-            db_name = service
-
-        return db_name, collection_name
-
+    @cache.cacheable(
+        key="search:project-group-map:{domain_id}:{project_group_ids}",
+        expire=180,
+        alias="local",
+    )
     def get_project_group_map(self, domain_id: str, project_group_ids: list) -> dict:
         db_name, collection_name = self._get_collection_and_db_name(
             "identity.ProjectGroup"
@@ -104,6 +101,39 @@ class ResourceManager(BaseManager):
         project_group_map = {pg["project_group_id"]: pg["name"] for pg in response}
 
         return project_group_map
+
+    def get_workspace_owner_and_member_workspaces(
+        self, domain_id: str, user_id: str, workspace_ids: list = None
+    ) -> Tuple:
+        workspace_member_workspaces = []
+        workspace_owner_workspaces = []
+        db_name, collection_name = self._get_collection_and_db_name("identity.UserRole")
+
+        find_filter = {"domain_id": domain_id, "user_id": user_id}
+        if workspace_ids:
+            find_filter["workspace_id"] = {"$in": workspace_ids}
+
+        results = list(self.client[db_name][collection_name].find(filter=find_filter))
+
+        for result in results:
+            if result["role_type"] == "WORKSPACE_OWNER":
+                workspace_member_workspaces.append(result["workspace_id"])
+            elif result["role_type"] == "WORKSPACE_MEMBER":
+                workspace_owner_workspaces.append(result["workspace_id"])
+
+        return workspace_owner_workspaces, workspace_member_workspaces
+
+    def _get_collection_and_db_name(self, resource_type: str) -> Tuple[str, str]:
+        service, resource = resource_type.split(".")
+
+        collection_name = self._pascal_to_snake_case(resource)
+        db_name = service.lower()
+        if prefix := SpaceONEPymongoClient.prefix:
+            db_name = f"{prefix}{db_name}"
+        else:
+            db_name = service
+
+        return db_name, collection_name
 
     @staticmethod
     def _pascal_to_snake_case(pascal_case: str):

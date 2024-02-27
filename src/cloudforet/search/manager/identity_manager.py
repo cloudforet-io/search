@@ -16,6 +16,10 @@ class IdentityManager(BaseManager):
             SpaceConnector, service="identity"
         )
 
-    @cache.cacheable("search:workspaces:{domain_id}:{user_id}", expire=300)
+    @cache.cacheable(
+        key="search:workspaces:{domain_id}:{user_id}",
+        expire=180,
+        alias="local",
+    )
     def get_workspaces(self, domain_id: str, user_id: str) -> dict:
         return self.identity_conn.dispatch("UserProfile.get_workspaces")
