@@ -1,15 +1,15 @@
 # Pymongo Databases Settings
-PYMONGO_DATABASES = {
-    "common": {
-        "db_prefix": "dev2",
-        "username": "cloudforet",
-        "password": "password1234",
-        "host": "mongodb://localhost:27017",
-    },
-    "identity": {
-        "db": "identity",
-    },
-}
+# PYMONGO_DATABASES = {
+#     "default": {
+#         "db_prefix": "dev2",
+#         "username": "cloudforet",
+#         "password": "password1234",
+#         "host": "mongodb://localhost:27017",
+#     },
+#     "identity": {
+#         "db": "identity",
+#     },
+# }
 
 DATABASES = {
     "default": {

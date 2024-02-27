@@ -1,6 +1,7 @@
 import base64
 import logging
 import re
+from typing import Dict, Any
 
 from spaceone.core import config
 from spaceone.core.error import *
@@ -61,66 +62,65 @@ class ResourceService(BaseService):
         )
         resource_type = params.resource_type
         next_token = params.next_token
+        limit = params.limit
         page = 0
 
-        workspace_project_map = {}
-        query_filter = {"$and": [{"domain_id": domain_id}]}
+        workspace_owner_workspaces = []
+        workspace_member_project_map = {}
+        find_filter: dict = {"$and": [{"domain_id": domain_id}]}
 
         if next_token:
-            next_token = self._decode_next_token(resource_type, next_token)
-            params.limit = next_token.get("limit")
-            query_filter = next_token.get("query_filter")
-            page = next_token.get("page")
+            decoded_next_token = self._decode_next_token(resource_type, next_token)
+            limit = decoded_next_token.get("limit")
+            find_filter = decoded_next_token.get("find_filter")
+            page = decoded_next_token.get("page")
 
         elif owner_type == "USER":
             if role_type != "DOMAIN_ADMIN":
                 if params.all_workspaces:
                     workspaces = self._get_all_workspace_ids(domain_id, user_id)
-                elif workspaces:
-                    for workspace_id in workspaces:
+
+                if workspaces:
+                    (
+                        workspace_owner_workspaces,
+                        workspace_member_workspaces,
+                    ) = self.resource_manager.get_workspace_owner_and_member_workspaces(
+                        domain_id, user_id, workspaces
+                    )
+                    for workspace_id in workspace_member_workspaces:
                         user_projects = self._get_all_projects(
                             domain_id, workspace_id, user_id
                         )
-                        workspace_project_map[workspace_id] = user_projects
+                        workspace_member_project_map[workspace_id] = user_projects
 
-        if workspace_project_map:
-            or_filter = {"$or": []}
-            for workspace_id, user_projects in workspace_project_map.items():
-                or_filter["$or"].append(
-                    {
-                        "workspace_id": workspace_id,
-                        "project_id": {"$in": user_projects},
-                    }
-                )
-                query_filter["$and"].append(or_filter)
+        if workspace_owner_workspaces or workspace_member_project_map:
+            find_filter = self._make_filter_by_workspaces(
+                find_filter, workspace_owner_workspaces, workspace_member_project_map
+            )
         elif workspaces:
-            query_filter["$and"].append({"workspace_id": {"$in": workspaces}})
+            find_filter["$and"].append({"workspace_id": {"$in": workspaces}})
         elif params.workspace_id:
-            query_filter["$and"].append({"workspace_id": params.workspace_id})
+            find_filter["$and"].append({"workspace_id": params.workspace_id})
+            if params.user_projects:
+                find_filter["$and"].append(
+                    {"project_id": {"$in": params.user_projects}}
+                )
 
         regex_pattern = re.compile(params.keyword, re.IGNORECASE)
-
-        if search_target := self.search_conf.get(resource_type):
-            or_filter = {"$or": []}
-            for keyword in search_target["request"]["search"]:
-                or_filter["$or"].append({keyword: {"$regex": regex_pattern}})
-            query_filter["$and"].append(or_filter)
-        else:
-            raise ERROR_INVALID_PARAMETER(key="resource_type")
-
-        query_filter = self._make_query_filter_by_resource_type(
-            resource_type, query_filter
+        find_filter = self._make_find_filter_by_resource_type(
+            find_filter, resource_type, regex_pattern
         )
-        print(query_filter, "query_filter")
+
         results = self.resource_manager.search_resource(
-            domain_id, query_filter, resource_type, params.limit, page
+            domain_id, find_filter, resource_type, limit, page
         )
 
         next_token = self._encode_next_token_base64(
-            results, resource_type, query_filter, params.limit, page
+            results, resource_type, find_filter, limit, page
         )
 
-        response = self._make_response(results, next_token, search_target["response"])
+        response_conf = self.search_conf.get(resource_type).get("response")
+        response = self._make_response(results, next_token, response_conf)
 
         return ResourcesResponse(**response)
 
@@ -172,16 +172,51 @@ class ResourceService(BaseService):
 
         return workspaces
 
-    @staticmethod
-    def _make_query_filter_by_resource_type(
-        resource_type: str, query_filter: dict
+    def _make_find_filter_by_resource_type(
+        self,
+        find_filter: dict,
+        resource_type: str,
+        regex_pattern: Optional[re.Pattern],
     ) -> dict:
-        if resource_type == "identity.Workspace":
-            query_filter["$and"].append({"state": "ENABLED"})
-        return query_filter
+        if search_target := self.search_conf.get(resource_type):
+            or_filter = {"$or": []}
+            for keyword in search_target["request"]["search"]:
+                or_filter["$or"].append({keyword: {"$regex": regex_pattern}})
+
+            if request_filters := search_target["request"].get("filter"):
+                for request_filter in request_filters:
+                    find_filter["$and"].append(request_filter)
+
+            find_filter["$and"].append(or_filter)
+        else:
+            raise ERROR_INVALID_PARAMETER(key="resource_type")
+
+        return find_filter
 
     @staticmethod
-    def _make_response(results: list, next_token: str, response_conf) -> dict:
+    def _make_filter_by_workspaces(
+        find_filter: dict,
+        workspace_owner_workspaces: list,
+        workspace_member_project_map: dict,
+    ):
+        or_filter = {"$or": []}
+        if workspace_owner_workspaces:
+            find_filter["$and"].append(
+                {"$or": {"workspace_id": {"$in": workspace_owner_workspaces}}}
+            )
+
+        for workspace_id, user_projects in workspace_member_project_map.items():
+            or_filter["$or"].append(
+                {
+                    "workspace_id": workspace_id,
+                    "project_id": {"$in": user_projects},
+                }
+            )
+            find_filter["$and"].append(or_filter)
+        return find_filter
+
+    @staticmethod
+    def _make_response(results: list, next_token: str, response_conf: dict) -> dict:
         response_format = response_conf["name"]
         for result in results:
             result["name"] = response_format.format(**result)
@@ -196,7 +231,7 @@ class ResourceService(BaseService):
     def _encode_next_token_base64(
         results: list,
         resource_type: str,
-        query_filter: dict,
+        find_filter: Dict[str, Any],
         limit: int,
         page: int,
     ) -> Union[str, None]:
@@ -205,7 +240,7 @@ class ResourceService(BaseService):
 
         next_token = {
             "resource_type": resource_type,
-            "query_filter": query_filter,
+            "find_filter": find_filter,
             "limit": limit,
             "page": page + 1,
         }
