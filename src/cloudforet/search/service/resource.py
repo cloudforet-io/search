@@ -1,7 +1,6 @@
 import base64
 import logging
 import re
-from typing import Dict, Any
 
 from spaceone.core import config
 from spaceone.core.error import *
@@ -55,6 +54,8 @@ class ResourceService(BaseService):
         user_id = self.transaction.meta.get("authorization.user_id")
         owner_type = self.transaction.meta.get("authorization.owner_type")
         role_type = self.transaction.meta.get("authorization.role_type")
+
+        self.check_resource_type(params.resource_type)
 
         domain_id = params.domain_id
         workspaces = self._get_accessible_workspaces(
@@ -124,6 +125,13 @@ class ResourceService(BaseService):
 
         return ResourcesResponse(**response)
 
+    def check_resource_type(self, resource_type: str):
+        if resource_type not in self.search_conf:
+            raise ERROR_INVALID_PARAMETER(
+                key=f"resource_type",
+                reason=f"Supported resource types: {list(self.search_conf.keys())}",
+            )
+
     def _get_all_workspace_ids(self, domain_id: str, user_id: str) -> list:
         identity_mgr: IdentityManager = self.locator.get_manager("IdentityManager")
         workspaces_info = identity_mgr.get_workspaces(domain_id, user_id)
@@ -188,8 +196,6 @@ class ResourceService(BaseService):
                     find_filter["$and"].append(request_filter)
 
             find_filter["$and"].append(or_filter)
-        else:
-            raise ERROR_INVALID_PARAMETER(key="resource_type")
 
         return find_filter
 
@@ -231,7 +237,7 @@ class ResourceService(BaseService):
     def _encode_next_token_base64(
         results: list,
         resource_type: str,
-        find_filter: Dict[str, Any],
+        find_filter: dict,
         limit: int,
         page: int,
     ) -> Union[str, None]:
@@ -252,7 +258,10 @@ class ResourceService(BaseService):
     def _decode_next_token(resource_type: str, next_token: str) -> dict:
         next_token = eval(base64.b64decode(next_token).decode("utf-8"))
         if next_token.get("resource_type") != resource_type:
-            raise ERROR_INVALID_PARAMETER(key="resource_type")
+            raise ERROR_INVALID_PARAMETER(
+                key="resource_type",
+                reason="Resource type is different from next_token.",
+            )
         return next_token
 
     @staticmethod

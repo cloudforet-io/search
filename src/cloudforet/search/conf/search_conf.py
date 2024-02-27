@@ -21,4 +21,8 @@ RESOURCE_TYPES = {
             "name": "{group} > {name}",
         },
     },
+    "dashboard.PublicDashboard": {
+        "request": {"search": ["name"]},
+        "response": {"resource_id": "public_dashboard_id", "name": "{name}"},
+    },
 }
