@@ -84,7 +84,6 @@ class ResourceManager(BaseManager):
     @cache.cacheable(
         key="search:project-group-map:{domain_id}:{project_group_ids}",
         expire=180,
-        alias="local",
     )
     def get_project_group_map(self, domain_id: str, project_group_ids: list) -> dict:
         db_name, collection_name = self._get_collection_and_db_name(

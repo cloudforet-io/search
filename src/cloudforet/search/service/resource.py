@@ -107,7 +107,8 @@ class ResourceService(BaseService):
                     {"project_id": {"$in": params.user_projects}}
                 )
 
-        regex_pattern = re.compile(params.keyword, re.IGNORECASE)
+        regex_pattern = self._get_regex_pattern(params.keyword)
+
         find_filter = self._make_find_filter_by_resource_type(
             find_filter, resource_type, regex_pattern
         )
@@ -198,6 +199,15 @@ class ResourceService(BaseService):
             find_filter["$and"].append(or_filter)
 
         return find_filter
+
+    @staticmethod
+    def _get_regex_pattern(keyword: str) -> re.Pattern:
+        if keyword:
+            regex_pattern = re.compile(f".*{keyword}.*", re.IGNORECASE)
+        else:
+            regex_pattern = re.compile(".*")
+
+        return regex_pattern
 
     @staticmethod
     def _make_filter_by_workspaces(
