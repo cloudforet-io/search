@@ -102,7 +102,7 @@ class ResourceService(BaseService):
             find_filter["$and"].append({"workspace_id": {"$in": workspaces}})
         elif params.workspace_id:
             find_filter["$and"].append({"workspace_id": params.workspace_id})
-            if params.user_projects:
+            if params.user_projects and resource_type != "identity.Workspace":
                 find_filter["$and"].append(
                     {"project_id": {"$in": params.user_projects}}
                 )
