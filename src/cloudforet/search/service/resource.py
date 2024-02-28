@@ -75,43 +75,45 @@ class ResourceService(BaseService):
             limit = decoded_next_token.get("limit")
             find_filter = decoded_next_token.get("find_filter")
             page = decoded_next_token.get("page")
+        else:
+            if owner_type == "USER":
+                if role_type != "DOMAIN_ADMIN":
+                    if params.all_workspaces:
+                        workspaces = self._get_all_workspace_ids(domain_id, user_id)
 
-        elif owner_type == "USER":
-            if role_type != "DOMAIN_ADMIN":
-                if params.all_workspaces:
-                    workspaces = self._get_all_workspace_ids(domain_id, user_id)
-
-                if workspaces:
-                    (
-                        workspace_owner_workspaces,
-                        workspace_member_workspaces,
-                    ) = self.resource_manager.get_workspace_owner_and_member_workspaces(
-                        domain_id, user_id, workspaces
-                    )
-                    for workspace_id in workspace_member_workspaces:
-                        user_projects = self._get_all_projects(
-                            domain_id, workspace_id, user_id
+                    if workspaces:
+                        (
+                            workspace_owner_workspaces,
+                            workspace_member_workspaces,
+                        ) = self.resource_manager.get_workspace_owner_and_member_workspaces(
+                            domain_id, user_id, workspaces
                         )
-                        workspace_member_project_map[workspace_id] = user_projects
+                        for workspace_id in workspace_member_workspaces:
+                            user_projects = self._get_all_projects(
+                                domain_id, workspace_id, user_id
+                            )
+                            workspace_member_project_map[workspace_id] = user_projects
 
-        if workspace_owner_workspaces or workspace_member_project_map:
-            find_filter = self._make_filter_by_workspaces(
-                find_filter, workspace_owner_workspaces, workspace_member_project_map
-            )
-        elif workspaces:
-            find_filter["$and"].append({"workspace_id": {"$in": workspaces}})
-        elif params.workspace_id:
-            find_filter["$and"].append({"workspace_id": params.workspace_id})
-            if params.user_projects and resource_type != "identity.Workspace":
-                find_filter["$and"].append(
-                    {"project_id": {"$in": params.user_projects}}
+            if workspace_owner_workspaces or workspace_member_project_map:
+                find_filter = self._make_filter_by_workspaces(
+                    find_filter,
+                    workspace_owner_workspaces,
+                    workspace_member_project_map,
                 )
+            elif workspaces:
+                find_filter["$and"].append({"workspace_id": {"$in": workspaces}})
+            elif params.workspace_id:
+                find_filter["$and"].append({"workspace_id": params.workspace_id})
+                if params.user_projects and resource_type != "identity.Workspace":
+                    find_filter["$and"].append(
+                        {"project_id": {"$in": params.user_projects}}
+                    )
 
-        regex_pattern = self._get_regex_pattern(params.keyword)
+            regex_pattern = self._get_regex_pattern(params.keyword)
 
-        find_filter = self._make_find_filter_by_resource_type(
-            find_filter, resource_type, regex_pattern
-        )
+            find_filter = self._make_find_filter_by_resource_type(
+                find_filter, resource_type, regex_pattern
+            )
 
         results = self.resource_manager.search_resource(
             domain_id, find_filter, resource_type, limit, page
