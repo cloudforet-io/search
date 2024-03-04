@@ -35,7 +35,7 @@ class ResourceManager(BaseManager):
         )
 
         if resource_type == "identity.Project":
-            project_group_ids = [result.get("project_group_id") for result in results]
+            project_group_ids = self._get_project_group_ids(results)
             project_group_map = self.get_project_group_map(domain_id, project_group_ids)
             for result in results:
                 if pg_id := result.get("project_group_id"):
@@ -121,6 +121,14 @@ class ResourceManager(BaseManager):
                 workspace_owner_workspaces.append(result["workspace_id"])
 
         return workspace_owner_workspaces, workspace_member_workspaces
+
+    @staticmethod
+    def _get_project_group_ids(results: list) -> list:
+        project_group_ids = []
+        for result in results:
+            if pg_id := result.get("project_group_id"):
+                project_group_ids.append(pg_id)
+        return project_group_ids
 
     def _get_collection_and_db_name(self, resource_type: str) -> Tuple[str, str]:
         service, resource = resource_type.split(".")
