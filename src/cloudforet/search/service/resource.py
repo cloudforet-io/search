@@ -174,7 +174,7 @@ class ResourceService(BaseService):
         workspaces: Union[list, None],
         all_workspaces: Union[bool, None],
     ) -> list:
-        if not all_workspaces or not workspaces:
+        if all_workspaces or not workspaces:
             return []
 
         # check is accessible workspace with params.workspaces
