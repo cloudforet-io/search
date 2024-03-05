@@ -175,11 +175,16 @@ class ResourceService(BaseService):
         all_workspaces: Union[bool, None],
     ) -> list:
         if all_workspaces or not workspaces:
-            return []
-
-        # check is accessible workspace with params.workspaces
-        workspace_ids = self._get_all_workspace_ids(domain_id, user_id)
-        workspaces = list(set(workspaces) & set(workspace_ids))
+            workspaces = []
+        elif user_id is None:
+            identity_mgr: IdentityManager = self.locator.get_manager("IdentityManager")
+            identity_mgr.list_workspace(
+                {"filter": [{"k": "workspace_id", "v": workspaces, "o": "in"}]}
+            )
+        else:
+            # check is accessible workspace with params.workspaces
+            workspace_ids = self._get_all_workspace_ids(domain_id, user_id)
+            workspaces = list(set(workspaces) & set(workspace_ids))
 
         return workspaces
 
@@ -236,9 +241,7 @@ class ResourceService(BaseService):
     @staticmethod
     def _make_response(results: list, next_token: str, response_conf: dict) -> dict:
         response_name_format = response_conf["name"]
-        response_description_format = response_conf.get(
-            "description", response_name_format
-        )
+        response_description_format = response_conf.get("description")
         for result in results:
             result["name"] = response_name_format.format(**result)
             result["resource_id"] = result[response_conf["resource_id"]]

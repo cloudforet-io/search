@@ -22,3 +22,6 @@ class IdentityManager(BaseManager):
     )
     def get_workspaces(self, domain_id: str, user_id: str) -> dict:
         return self.identity_conn.dispatch("UserProfile.get_workspaces")
+
+    def list_workspace(self, query: dict) -> dict:
+        return self.identity_conn.dispatch("Workspace.list", {"query": query})
