@@ -23,6 +23,10 @@ RESOURCE_TYPES = {
     },
     "dashboard.PublicDashboard": {
         "request": {"search": ["name"]},
-        "response": {"resource_id": "public_dashboard_id", "name": "{name}"},
+        "response": {
+            "resource_id": "public_dashboard_id",
+            "name": "{name}",
+            "description": "{description}",
+        },
     },
 }

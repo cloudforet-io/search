@@ -235,10 +235,15 @@ class ResourceService(BaseService):
 
     @staticmethod
     def _make_response(results: list, next_token: str, response_conf: dict) -> dict:
-        response_format = response_conf["name"]
+        response_name_format = response_conf["name"]
+        response_description_format = response_conf.get(
+            "description", response_name_format
+        )
         for result in results:
-            result["name"] = response_format.format(**result)
+            result["name"] = response_name_format.format(**result)
             result["resource_id"] = result[response_conf["resource_id"]]
+            if response_description_format:
+                result["description"] = response_description_format.format(**result)
 
         return {
             "results": results,
