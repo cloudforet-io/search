@@ -1,9 +1,22 @@
 RESOURCE_TYPES = {
     "identity.ServiceAccount": {
-        "request": {"search": ["name"]},
+        "request": {
+            "search": [
+                "name",
+                "data.account_id",
+                "data.subscription_id",
+                "data.tenant_id",
+                "data.project_id",
+            ]
+        },
         "response": {
             "resource_id": "service_account_id",
-            "name": "{service_account_id} ({name})",
+            "name": "{account} ({name})",
+            "aliases": [
+                {"data.account_id": "account"},
+                {"data.subscription_id": "account"},
+                {"data.project_id": "account"},
+            ],
         },
     },
     "identity.Project": {
@@ -19,6 +32,15 @@ RESOURCE_TYPES = {
         "response": {
             "resource_id": "cloud_service_type_id",
             "name": "{group} > {name}",
+            "aliases": [
+                {"tags.spaceone:icon": "icon"},
+            ],
+            "tags": {
+                "provider": "{provider}",
+                "icon": "{icon}",
+                "group": "{group}",
+                "name": "{name}",
+            },
         },
     },
     "inventory.CloudService": {

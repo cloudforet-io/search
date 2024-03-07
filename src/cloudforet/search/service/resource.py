@@ -3,6 +3,7 @@ import logging
 import re
 
 from spaceone.core import config
+from spaceone.core.utils import *
 from spaceone.core.error import *
 from spaceone.core.service import *
 from spaceone.core.service.utils import *
@@ -199,6 +200,30 @@ class ResourceService(BaseService):
 
         return find_filter
 
+    def _make_response(
+        self, results: list, next_token: str, response_conf: dict
+    ) -> dict:
+        name_format = response_conf["name"]
+        description_format = response_conf.get("description")
+        aliases: list = response_conf.get("aliases")
+        tags: dict = response_conf.get("tags")
+        for result in results:
+            # Make description at response
+            if description_format:
+                result["description"] = name_format.format(**result)
+            if aliases:
+                result = self._convert_result_by_alias(result, aliases)
+            if tags:
+                result = self._add_additional_info_to_tags(result, tags)
+
+            result["name"] = name_format.format(**result)
+            result["resource_id"] = result[response_conf["resource_id"]]
+
+        return {
+            "results": results,
+            "next_token": next_token,
+        }
+
     @staticmethod
     def _get_regex_pattern(keyword: str) -> re.Pattern:
         if keyword:
@@ -230,21 +255,6 @@ class ResourceService(BaseService):
             find_filter["$and"].append(or_filter)
         _LOGGER.debug(f"[_make_filter_by_workspaces] find_filter: {find_filter}")
         return find_filter
-
-    @staticmethod
-    def _make_response(results: list, next_token: str, response_conf: dict) -> dict:
-        response_name_format = response_conf["name"]
-        response_description_format = response_conf.get("description")
-        for result in results:
-            result["name"] = response_name_format.format(**result)
-            result["resource_id"] = result[response_conf["resource_id"]]
-            if response_description_format:
-                result["description"] = response_description_format.format(**result)
-
-        return {
-            "results": results,
-            "next_token": next_token,
-        }
 
     @staticmethod
     def _encode_next_token_base64(
@@ -284,3 +294,20 @@ class ResourceService(BaseService):
             f"{package}.conf.search_conf", fromlist=["search_conf"]
         )
         return getattr(search_conf_module, "RESOURCE_TYPES", [])
+
+    @staticmethod
+    def _convert_result_by_alias(result: dict, aliases: list) -> dict:
+        for alias in aliases:
+            for target_field, alias_name in alias.items():
+                if value := get_dict_value(result, target_field):
+                    result[alias_name] = value
+        return result
+
+    @staticmethod
+    def _add_additional_info_to_tags(result: dict, tags: dict) -> dict:
+        response_tags = {}
+        for key, value in tags.items():
+            if target_value := get_dict_value(result, key):
+                response_tags[key] = target_value
+        result["tags"] = response_tags
+        return result
