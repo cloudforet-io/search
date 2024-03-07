@@ -58,9 +58,7 @@ class ResourceService(BaseService):
         self.check_resource_type(params.resource_type)
 
         domain_id = params.domain_id
-        workspaces = self._get_accessible_workspaces(
-            domain_id, user_id, params.workspaces, params.all_workspaces
-        )
+        workspaces = [] if params.all_workspaces else params.workspaces
         resource_type = params.resource_type
         next_token = params.next_token
         limit = params.limit
@@ -79,9 +77,8 @@ class ResourceService(BaseService):
             if owner_type == "USER":
                 if role_type != "DOMAIN_ADMIN":
                     if params.all_workspaces:
-                        workspaces = self._get_all_workspace_ids(domain_id, user_id)
-
-                    if workspaces:
+                        workspaces = self._get_accessible_workspaces(domain_id, user_id)
+                    elif workspaces:
                         (
                             workspace_owner_workspaces,
                             workspace_member_workspaces,
@@ -115,6 +112,7 @@ class ResourceService(BaseService):
                 find_filter, resource_type, regex_pattern
             )
 
+        # search resources
         results = self.resource_manager.search_resource(
             domain_id, find_filter, resource_type, limit, page
         )
@@ -171,20 +169,14 @@ class ResourceService(BaseService):
         self,
         domain_id: str,
         user_id: str,
-        workspaces: Union[list, None],
-        all_workspaces: Union[bool, None],
+        workspaces: Union[list, None] = None,
     ) -> list:
-        if all_workspaces or not workspaces:
-            workspaces = []
-        elif user_id is None:
-            identity_mgr: IdentityManager = self.locator.get_manager("IdentityManager")
-            identity_mgr.list_workspace(
-                {"filter": [{"k": "workspace_id", "v": workspaces, "o": "in"}]}
-            )
-        else:
-            # check is accessible workspace with params.workspaces
-            workspace_ids = self._get_all_workspace_ids(domain_id, user_id)
+        # check is accessible workspace with params.workspaces
+        workspace_ids = self._get_all_workspace_ids(domain_id, user_id)
+        if workspaces:
             workspaces = list(set(workspaces) & set(workspace_ids))
+        else:
+            workspaces = workspace_ids
 
         return workspaces
 
