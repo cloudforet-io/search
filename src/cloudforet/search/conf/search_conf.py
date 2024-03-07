@@ -1,6 +1,6 @@
 RESOURCE_TYPES = {
     "identity.ServiceAccount": {
-        "request": {"search": ["service_account_id", "name"]},
+        "request": {"search": ["name"]},
         "response": {
             "resource_id": "service_account_id",
             "name": "{service_account_id} ({name})",
