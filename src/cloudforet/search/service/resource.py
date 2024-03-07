@@ -12,7 +12,7 @@ from cloudforet.search.manager.identity_manager import IdentityManager
 from cloudforet.search.model.resource.response import *
 from cloudforet.search.model.resource.request import *
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger("spaceone")
 
 
 @authentication_handler
@@ -225,7 +225,7 @@ class ResourceService(BaseService):
         or_filter = {"$or": []}
         if workspace_owner_workspaces:
             find_filter["$and"].append(
-                {"$or": {"workspace_id": {"$in": workspace_owner_workspaces}}}
+                {"$or": [{"workspace_id": {"$in": workspace_owner_workspaces}}]}
             )
 
         for workspace_id, user_projects in workspace_member_project_map.items():
@@ -236,6 +236,7 @@ class ResourceService(BaseService):
                 }
             )
             find_filter["$and"].append(or_filter)
+        _LOGGER.debug(f"[_make_filter_by_workspaces] find_filter: {find_filter}")
         return find_filter
 
     @staticmethod

@@ -6,7 +6,7 @@ from spaceone.core.manager import BaseManager
 from spaceone.core.connector.space_connector import SpaceConnector
 from spaceone.core.auth.jwt.jwt_util import JWTUtil
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger("spaceone")
 
 
 class IdentityManager(BaseManager):
