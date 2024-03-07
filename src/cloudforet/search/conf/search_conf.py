@@ -35,7 +35,12 @@ RESOURCE_TYPES = {
             "aliases": [
                 {"tags.spaceone:icon": "icon"},
             ],
-            "tags": {"provider": "{provider}", "icon": "{icon}"},
+            "tags": {
+                "provider": "{provider}",
+                "icon": "{icon}",
+                "group": "{group}",
+                "name": "{name}",
+            },
         },
     },
     "inventory.CloudService": {

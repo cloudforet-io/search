@@ -208,7 +208,6 @@ class ResourceService(BaseService):
         aliases: list = response_conf.get("aliases")
         tags: dict = response_conf.get("tags")
         for result in results:
-            result["tags"] = {}
             # Make description at response
             if description_format:
                 result["description"] = name_format.format(**result)
@@ -306,6 +305,9 @@ class ResourceService(BaseService):
 
     @staticmethod
     def _add_additional_info_to_tags(result: dict, tags: dict) -> dict:
+        response_tags = {}
         for key, value in tags.items():
-            result["tags"][key] = value.format(**result)
+            if target_value := get_dict_value(result, key):
+                response_tags[key] = target_value
+        result["tags"] = response_tags
         return result
