@@ -7,7 +7,7 @@ from spaceone.core.manager import BaseManager
 
 from cloudforet.search.lib.pymongo_client import SpaceONEPymongoClient
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger("spaceone")
 
 
 class ResourceManager(BaseManager):
@@ -58,10 +58,6 @@ class ResourceManager(BaseManager):
                     result["description"] = dashboard_type
 
         _LOGGER.debug(f"[search] find_filter: {find_filter}")
-        print(
-            f"[search] find_filter: {find_filter}"
-        )  # todo: need to remove temporary debug code
-
         return results
 
     def list_public_project(self, domain_id: str, workspace_id: str) -> list:
@@ -155,7 +151,9 @@ class ResourceManager(BaseManager):
     ) -> Tuple:
         workspace_member_workspaces = []
         workspace_owner_workspaces = []
-        db_name, collection_name = self._get_collection_and_db_name("identity.UserRole")
+        db_name, collection_name = self._get_collection_and_db_name(
+            "identity.RoleBinding"
+        )
 
         find_filter = {"domain_id": domain_id, "user_id": user_id}
         if workspace_ids:
@@ -165,10 +163,12 @@ class ResourceManager(BaseManager):
 
         for result in results:
             if result["role_type"] == "WORKSPACE_OWNER":
-                workspace_member_workspaces.append(result["workspace_id"])
-            elif result["role_type"] == "WORKSPACE_MEMBER":
                 workspace_owner_workspaces.append(result["workspace_id"])
-
+            elif result["role_type"] == "WORKSPACE_MEMBER":
+                workspace_member_workspaces.append(result["workspace_id"])
+        _LOGGER.debug(
+            f"[get_workspace_owner_and_member_workspaces] workspace_owner_workspaces: {workspace_owner_workspaces}, workspace_member_workspaces: {workspace_member_workspaces}"
+        )
         return workspace_owner_workspaces, workspace_member_workspaces
 
     def _get_collection_and_db_name(self, resource_type: str) -> Tuple[str, str]:

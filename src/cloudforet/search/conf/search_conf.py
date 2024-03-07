@@ -7,7 +7,7 @@ RESOURCE_TYPES = {
         },
     },
     "identity.Project": {
-        "request": {"search": ["name", "project_id"]},
+        "request": {"search": ["name"]},
         "response": {"resource_id": "project_id", "name": "{name}"},
     },
     "identity.Workspace": {
@@ -19,6 +19,20 @@ RESOURCE_TYPES = {
         "response": {
             "resource_id": "cloud_service_type_id",
             "name": "{group} > {name}",
+        },
+    },
+    "inventory.CloudService": {
+        "request": {
+            "search": [
+                "name",
+                "ip_addresses",
+                "account",
+            ],
+            "filter": [{"state": "ACTIVE"}],
+        },
+        "response": {
+            "resource_id": "cloud_service_id",
+            "name": "{name}",
         },
     },
     "dashboard.PublicDashboard": {

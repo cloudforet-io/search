@@ -3,7 +3,7 @@ import logging
 from spaceone.core import config
 from pymongo import MongoClient
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger("spaceone")
 
 
 class SpaceONEPymongoClient:
