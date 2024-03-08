@@ -148,6 +148,7 @@ class ResourceService(BaseService):
 
         response_conf = self.search_conf.get(resource_type).get("response")
         response = self._make_response(results, next_token, response_conf)
+        print(response)
 
         return ResourcesResponse(**response)
 
@@ -266,6 +267,8 @@ class ResourceService(BaseService):
                 result = self._convert_result_by_alias(result, aliases)
             if tags:
                 result = self._add_additional_info_to_tags(result, tags)
+            else:
+                result["tags"] = {}
 
             result["name"] = name_format.format(**result)
             result["resource_id"] = result[response_conf["resource_id"]]
