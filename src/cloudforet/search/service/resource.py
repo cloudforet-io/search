@@ -15,6 +15,8 @@ from cloudforet.search.model.resource.request import *
 
 _LOGGER = logging.getLogger("spaceone")
 
+DISABLED_PROJECT_RESOURCE_TYPES = ["identity.Workspace", "inventory.CloudServiceType"]
+
 
 @authentication_handler
 @authorization_handler
@@ -51,14 +53,14 @@ class ResourceService(BaseService):
             ResourcesResponse:
         """
 
-        # permissions = self.transaction.meta.get("authorization.permissions", [])
-        user_id = self.transaction.meta.get("authorization.user_id")
-        owner_type = self.transaction.meta.get("authorization.owner_type")
-        role_type = self.transaction.meta.get("authorization.role_type")
-
         self.check_resource_type(params.resource_type)
 
+        # permissions = self.transaction.meta.get("authorization.permissions", [])
+        user_id = self.transaction.meta.get("authorization.user_id")
+        role_type = self.transaction.meta.get("authorization.role_type")
+
         domain_id = params.domain_id
+        all_workspaces = params.all_workspaces
         workspaces = [] if params.all_workspaces else params.workspaces
         resource_type = params.resource_type
         next_token = params.next_token
@@ -66,7 +68,7 @@ class ResourceService(BaseService):
         page = 0
 
         workspace_owner_workspaces = []
-        workspace_member_project_map = {}
+        workspace_project_map = {}
         find_filter: dict = {"$and": [{"domain_id": domain_id}]}
 
         if next_token:
@@ -75,34 +77,56 @@ class ResourceService(BaseService):
             find_filter = decoded_next_token.get("find_filter")
             page = decoded_next_token.get("page")
         else:
-            if owner_type == "USER":
-                if role_type != "DOMAIN_ADMIN":
-                    if params.all_workspaces:
-                        workspaces = self._get_accessible_workspaces(domain_id, user_id)
-                    elif workspaces:
-                        (
-                            workspace_owner_workspaces,
-                            workspace_member_workspaces,
-                        ) = self.resource_manager.get_workspace_owner_and_member_workspaces(
+            if role_type == "DOMAIN_ADMIN":
+                if workspaces:
+                    workspaces = self._get_accessible_workspaces(
+                        domain_id, role_type, workspaces, user_id
+                    )
+            else:
+                if all_workspaces or workspaces:
+                    workspaces = self._get_accessible_workspaces(
+                        domain_id, role_type, workspaces, user_id
+                    )
+
+                if workspaces:
+                    if resource_type not in DISABLED_PROJECT_RESOURCE_TYPES:
+                        role_bindings_info = self.resource_manager.get_role_bindings(
                             domain_id, user_id, workspaces
                         )
-                        for workspace_id in workspace_member_workspaces:
-                            user_projects = self._get_all_projects(
-                                domain_id, workspace_id, user_id
+                        workspace_owner_workspaces = (
+                            self.resource_manager.get_workspace_owner_workspaces(
+                                role_bindings_info
                             )
-                            workspace_member_project_map[workspace_id] = user_projects
+                        )
 
-            if workspace_owner_workspaces or workspace_member_project_map:
+                        workspace_member_workspaces = (
+                            self.resource_manager.get_workspace_member_workspaces(
+                                role_bindings_info
+                            )
+                        )
+
+                        workspace_project_map = self._get_workspace_project_map(
+                            domain_id, workspace_member_workspaces, user_id
+                        )
+
+            if workspace_owner_workspaces or workspace_project_map:
                 find_filter = self._make_filter_by_workspaces(
                     find_filter,
                     workspace_owner_workspaces,
-                    workspace_member_project_map,
+                )
+
+                find_filter = self._make_filter_by_workspace_project_map(
+                    find_filter,
+                    workspace_project_map,
                 )
             elif workspaces:
                 find_filter["$and"].append({"workspace_id": {"$in": workspaces}})
             elif params.workspace_id:
                 find_filter["$and"].append({"workspace_id": params.workspace_id})
-                if params.user_projects and resource_type != "identity.Workspace":
+                if (
+                    params.user_projects
+                    and resource_type not in DISABLED_PROJECT_RESOURCE_TYPES
+                ):
                     find_filter["$and"].append(
                         {"project_id": {"$in": params.user_projects}}
                     )
@@ -134,27 +158,39 @@ class ResourceService(BaseService):
                 reason=f"Supported resource types: {list(self.search_conf.keys())}",
             )
 
-    def _get_all_workspace_ids(self, domain_id: str, user_id: str) -> list:
+    def _get_all_workspaces(
+        self,
+        domain_id: str,
+        role_type: str,
+        user_id: str = None,
+    ) -> list:
         identity_mgr: IdentityManager = self.locator.get_manager("IdentityManager")
-        workspaces_info = identity_mgr.get_workspaces(domain_id, user_id)
-        workspace_ids = [
-            info["workspace_id"] for info in workspaces_info.get("results", [])
-        ]
-        return workspace_ids
+
+        if role_type == "DOMAIN_ADMIN":
+            results = identity_mgr.list_workspace(query={}).get("results", [])
+        elif user_id:
+            # In case of USER who has WORKSPACE_OWNER or WORKSPACE_MEMBER role
+            results = identity_mgr.get_workspaces(domain_id, user_id).get("results", [])
+        else:
+            # In case of WORKSPACE_OWNER App
+            results = []
+
+        workspaces = [result["workspace_id"] for result in results]
+        return workspaces
 
     def _get_all_projects(
         self, domain_id: str, workspace_id: str, user_id: str = None
     ) -> list:
         user_projects = []
 
-        public_projects_info = self.resource_manager.list_public_project(
+        public_projects_info = self.resource_manager.list_public_projects(
             domain_id, workspace_id
         )
         user_projects.extend(
             [project_info["project_id"] for project_info in public_projects_info]
         )
 
-        private_projects_info = self.resource_manager.list_private_project(
+        private_projects_info = self.resource_manager.list_private_projects(
             domain_id,
             workspace_id,
             user_id,
@@ -166,14 +202,29 @@ class ResourceService(BaseService):
 
         return user_projects
 
+    def _get_workspace_project_map(
+        self,
+        domain_id: str,
+        workspaces: list,
+        user_id: str,
+    ) -> dict:
+        workspace_project_map = {}
+        for workspace_id in workspaces:
+            workspace_projects = self._get_all_projects(
+                domain_id, workspace_id, user_id
+            )
+            workspace_project_map[workspace_id] = workspace_projects
+        return workspace_project_map
+
     def _get_accessible_workspaces(
         self,
         domain_id: str,
-        user_id: str,
-        workspaces: Union[list, None] = None,
+        role_type: str,
+        workspaces: list = None,
+        user_id: str = None,
     ) -> list:
         # check is accessible workspace with params.workspaces
-        workspace_ids = self._get_all_workspace_ids(domain_id, user_id)
+        workspace_ids = self._get_all_workspaces(domain_id, role_type, user_id)
         if workspaces:
             workspaces = list(set(workspaces) & set(workspace_ids))
         else:
@@ -225,27 +276,22 @@ class ResourceService(BaseService):
         }
 
     @staticmethod
-    def _get_regex_pattern(keyword: str) -> re.Pattern:
-        if keyword:
-            regex_pattern = re.compile(f".*{keyword}.*", re.IGNORECASE)
-        else:
-            regex_pattern = re.compile(".*")
-
-        return regex_pattern
-
-    @staticmethod
     def _make_filter_by_workspaces(
         find_filter: dict,
-        workspace_owner_workspaces: list,
-        workspace_member_project_map: dict,
+        workspaces: list,
+    ):
+        if workspaces:
+            find_filter["$and"].append({"$or": [{"workspace_id": {"$in": workspaces}}]})
+
+        _LOGGER.debug(f"[_make_filter_by_workspaces] find_filter: {find_filter}")
+        return find_filter
+
+    @staticmethod
+    def _make_filter_by_workspace_project_map(
+        find_filter: dict, workspace_project_map: dict
     ):
         or_filter = {"$or": []}
-        if workspace_owner_workspaces:
-            find_filter["$and"].append(
-                {"$or": [{"workspace_id": {"$in": workspace_owner_workspaces}}]}
-            )
-
-        for workspace_id, user_projects in workspace_member_project_map.items():
+        for workspace_id, user_projects in workspace_project_map.items():
             or_filter["$or"].append(
                 {
                     "workspace_id": workspace_id,
@@ -253,8 +299,19 @@ class ResourceService(BaseService):
                 }
             )
             find_filter["$and"].append(or_filter)
-        _LOGGER.debug(f"[_make_filter_by_workspaces] find_filter: {find_filter}")
+        _LOGGER.debug(
+            f"[_make_filer_by_workspace_project_map] find_filter: {find_filter}"
+        )
         return find_filter
+
+    @staticmethod
+    def _get_regex_pattern(keyword: str) -> re.Pattern:
+        if keyword:
+            regex_pattern = re.compile(f".*{keyword}.*", re.IGNORECASE)
+        else:
+            regex_pattern = re.compile(".*")
+
+        return regex_pattern
 
     @staticmethod
     def _encode_next_token_base64(
