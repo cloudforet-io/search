@@ -1,12 +1,11 @@
-import base64
 import logging
-import re
 
 from spaceone.core import config
-from spaceone.core.utils import *
+from spaceone.core.auth.jwt.jwt_util import JWTUtil
 from spaceone.core.error import *
 from spaceone.core.service import *
 from spaceone.core.service.utils import *
+from spaceone.core.utils import *
 
 from cloudforet.search.manager.resource_manager import ResourceManager
 from cloudforet.search.manager.identity_manager import IdentityManager
@@ -148,7 +147,6 @@ class ResourceService(BaseService):
 
         response_conf = self.search_conf.get(resource_type).get("response")
         response = self._make_response(results, next_token, response_conf)
-        print(response)
 
         return ResourcesResponse(**response)
 
@@ -237,7 +235,7 @@ class ResourceService(BaseService):
         self,
         find_filter: dict,
         resource_type: str,
-        regex_pattern: Optional[re.Pattern],
+        regex_pattern: str,
     ) -> dict:
         if search_target := self.search_conf.get(resource_type):
             or_filter = {"$or": []}
@@ -278,6 +276,44 @@ class ResourceService(BaseService):
             "next_token": next_token,
         }
 
+    def _encode_next_token_base64(
+        self,
+        results: list,
+        resource_type: str,
+        find_filter: dict,
+        limit: int,
+        page: int,
+    ) -> Union[str, None]:
+        if limit == 0 or len(results) != limit:
+            return None
+
+        next_token_payload = {
+            "resource_type": resource_type,
+            "find_filter": find_filter,
+            "limit": limit,
+            "page": page + 1,
+        }
+        secret_key = self.transaction.meta.get("token")
+        next_token = JWTUtil.encode(next_token_payload, secret_key, algorithm="HS256")
+        return next_token
+
+    def _decode_next_token(self, resource_type: str, next_token: str) -> dict:
+        secret_key = self.transaction.meta.get("token")
+
+        try:
+            next_token = JWTUtil.decode(
+                token=next_token, public_jwk=secret_key, algorithm="HS256"
+            )
+            if next_token.get("resource_type") != resource_type:
+                raise ERROR_INVALID_PARAMETER(
+                    key="resource_type",
+                    reason="Resource type is different from next_token.",
+                )
+        except Exception:
+            raise ERROR_PERMISSION_DENIED(reason="Invalid next_token.")
+
+        return next_token
+
     @staticmethod
     def _make_filter_by_workspaces(
         find_filter: dict,
@@ -308,44 +344,13 @@ class ResourceService(BaseService):
         return find_filter
 
     @staticmethod
-    def _get_regex_pattern(keyword: str) -> re.Pattern:
+    def _get_regex_pattern(keyword: str) -> str:
         if keyword:
-            regex_pattern = re.compile(f".*{keyword}.*", re.IGNORECASE)
+            regex_pattern = re.compile(f".*{keyword}.*", re.IGNORECASE).pattern
         else:
-            regex_pattern = re.compile(".*")
+            regex_pattern = re.compile(".*").pattern
 
         return regex_pattern
-
-    @staticmethod
-    def _encode_next_token_base64(
-        results: list,
-        resource_type: str,
-        find_filter: dict,
-        limit: int,
-        page: int,
-    ) -> Union[str, None]:
-        if limit == 0 or len(results) != limit:
-            return None
-
-        next_token = {
-            "resource_type": resource_type,
-            "find_filter": find_filter,
-            "limit": limit,
-            "page": page + 1,
-        }
-
-        next_token = base64.b64encode(str(next_token).encode()).decode("utf-8")
-        return next_token
-
-    @staticmethod
-    def _decode_next_token(resource_type: str, next_token: str) -> dict:
-        next_token = eval(base64.b64decode(next_token).decode("utf-8"))
-        if next_token.get("resource_type") != resource_type:
-            raise ERROR_INVALID_PARAMETER(
-                key="resource_type",
-                reason="Resource type is different from next_token.",
-            )
-        return next_token
 
     @staticmethod
     def _get_search_conf() -> dict:
