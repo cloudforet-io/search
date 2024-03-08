@@ -45,16 +45,13 @@ RESOURCE_TYPES = {
     },
     "inventory.CloudService": {
         "request": {
-            "search": [
-                "name",
-                "ip_addresses",
-                "account",
-            ],
+            "search": ["name", "ip_addresses", "account", "instance_type"],
             "filter": [{"state": "ACTIVE"}],
         },
         "response": {
             "resource_id": "cloud_service_id",
             "name": "{name}",
+            "description": "{cloud_service_group} > {cloud_service_type}",
         },
     },
     "dashboard.PublicDashboard": {

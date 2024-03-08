@@ -123,8 +123,8 @@ class ResourceService(BaseService):
             elif params.workspace_id:
                 find_filter["$and"].append({"workspace_id": params.workspace_id})
                 if (
-                    params.user_projects
-                    and resource_type not in DISABLED_PROJECT_RESOURCE_TYPES
+                        params.user_projects
+                        and resource_type not in DISABLED_PROJECT_RESOURCE_TYPES
                 ):
                     find_filter["$and"].append(
                         {"project_id": {"$in": params.user_projects}}
@@ -158,10 +158,10 @@ class ResourceService(BaseService):
             )
 
     def _get_all_workspaces(
-        self,
-        domain_id: str,
-        role_type: str,
-        user_id: str = None,
+            self,
+            domain_id: str,
+            role_type: str,
+            user_id: str = None,
     ) -> list:
         identity_mgr: IdentityManager = self.locator.get_manager("IdentityManager")
 
@@ -178,7 +178,7 @@ class ResourceService(BaseService):
         return workspaces
 
     def _get_all_projects(
-        self, domain_id: str, workspace_id: str, user_id: str = None
+            self, domain_id: str, workspace_id: str, user_id: str = None
     ) -> list:
         user_projects = []
 
@@ -202,10 +202,10 @@ class ResourceService(BaseService):
         return user_projects
 
     def _get_workspace_project_map(
-        self,
-        domain_id: str,
-        workspaces: list,
-        user_id: str,
+            self,
+            domain_id: str,
+            workspaces: list,
+            user_id: str,
     ) -> dict:
         workspace_project_map = {}
         for workspace_id in workspaces:
@@ -216,11 +216,11 @@ class ResourceService(BaseService):
         return workspace_project_map
 
     def _get_accessible_workspaces(
-        self,
-        domain_id: str,
-        role_type: str,
-        workspaces: list = None,
-        user_id: str = None,
+            self,
+            domain_id: str,
+            role_type: str,
+            workspaces: list = None,
+            user_id: str = None,
     ) -> list:
         # check is accessible workspace with params.workspaces
         workspace_ids = self._get_all_workspaces(domain_id, role_type, user_id)
@@ -232,7 +232,7 @@ class ResourceService(BaseService):
         return workspaces
 
     def _make_find_filter_by_resource_type(
-        self, find_filter: dict, resource_type: str, regex_pattern: str
+            self, find_filter: dict, resource_type: str, regex_pattern: str
     ) -> dict:
         if search_target := self.search_conf.get(resource_type):
             or_filter = {"$or": []}
@@ -250,7 +250,7 @@ class ResourceService(BaseService):
         return find_filter
 
     def _make_response(
-        self, results: list, next_token: str, response_conf: dict
+            self, results: list, next_token: str, response_conf: dict
     ) -> dict:
         name_format = response_conf["name"]
         description_format = response_conf.get("description")
@@ -259,7 +259,7 @@ class ResourceService(BaseService):
         for result in results:
             # Make description at response
             if description_format:
-                result["description"] = name_format.format(**result)
+                result["description"] = description_format.format(**result)
             if aliases:
                 result = self._convert_result_by_alias(result, aliases)
             if tags:
@@ -276,12 +276,12 @@ class ResourceService(BaseService):
         }
 
     def _encode_next_token_base64(
-        self,
-        results: list,
-        resource_type: str,
-        find_filter: dict,
-        limit: int,
-        page: int,
+            self,
+            results: list,
+            resource_type: str,
+            find_filter: dict,
+            limit: int,
+            page: int,
     ) -> Union[str, None]:
         if limit == 0 or len(results) != limit:
             return None
@@ -315,8 +315,8 @@ class ResourceService(BaseService):
 
     @staticmethod
     def _make_filter_by_workspaces(
-        find_filter: dict,
-        workspaces: list,
+            find_filter: dict,
+            workspaces: list,
     ):
         if workspaces:
             find_filter["$and"].append({"$or": [{"workspace_id": {"$in": workspaces}}]})
@@ -326,7 +326,7 @@ class ResourceService(BaseService):
 
     @staticmethod
     def _make_filter_by_workspace_project_map(
-        find_filter: dict, workspace_project_map: dict
+            find_filter: dict, workspace_project_map: dict
     ):
         or_filter = {"$or": []}
         for workspace_id, user_projects in workspace_project_map.items():
