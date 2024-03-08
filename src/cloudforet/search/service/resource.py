@@ -148,7 +148,6 @@ class ResourceService(BaseService):
 
         response_conf = self.search_conf.get(resource_type).get("response")
         response = self._make_response(results, next_token, response_conf)
-        print(response)
 
         return ResourcesResponse(**response)
 
