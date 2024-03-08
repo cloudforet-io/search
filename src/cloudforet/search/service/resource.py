@@ -232,12 +232,14 @@ class ResourceService(BaseService):
         return workspaces
 
     def _make_find_filter_by_resource_type(
-        self, find_filter: dict, resource_type: str, regex_pattern: re.Pattern
+        self, find_filter: dict, resource_type: str, regex_pattern: str
     ) -> dict:
         if search_target := self.search_conf.get(resource_type):
             or_filter = {"$or": []}
             for keyword in search_target["request"]["search"]:
-                or_filter["$or"].append({keyword: {"$regex": regex_pattern}})
+                or_filter["$or"].append(
+                    {keyword: {"$regex": regex_pattern, "$options": "i"}}
+                )
 
             if request_filters := search_target["request"].get("filter"):
                 for request_filter in request_filters:
@@ -341,11 +343,10 @@ class ResourceService(BaseService):
         return find_filter
 
     @staticmethod
-    def _get_regex_pattern(keyword: str) -> re.Pattern:
+    def _get_regex_pattern(keyword: str) -> str:
+        regex_pattern = ".*"
         if keyword:
-            regex_pattern = re.compile(f".*{keyword}.*", re.IGNORECASE)
-        else:
-            regex_pattern = re.compile(".*")
+            regex_pattern = f".*{keyword}.*"
 
         return regex_pattern
 
