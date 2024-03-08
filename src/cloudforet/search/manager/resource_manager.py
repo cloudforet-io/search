@@ -57,10 +57,23 @@ class ResourceManager(BaseManager):
                 else:
                     result["description"] = dashboard_type
 
-        _LOGGER.debug(f"[search] find_filter: {find_filter}")
+        _LOGGER.debug(
+            f"[search] resource_type: {resource_type}, find_filter: {find_filter}"
+        )
         return results
 
-    def list_public_project(self, domain_id: str, workspace_id: str) -> list:
+    def list_workspaces(self, domain_id: str) -> list:
+        db_name, collection_name = self._get_collection_and_db_name(
+            "identity.Workspace"
+        )
+        response = list(
+            self.client[db_name][collection_name].find(
+                {"domain_id": domain_id, "state": "ENABLED"}
+            )
+        )
+        return response
+
+    def list_public_projects(self, domain_id: str, workspace_id: str) -> list:
         db_name, collection_name = self._get_collection_and_db_name("identity.Project")
         response = list(
             self.client[db_name][collection_name].find(
@@ -73,7 +86,7 @@ class ResourceManager(BaseManager):
         )
         return response
 
-    def list_private_project(
+    def list_private_projects(
         self,
         domain_id: str,
         workspace_id: str,
@@ -146,30 +159,19 @@ class ResourceManager(BaseManager):
 
         return project_group_map
 
-    def get_workspace_owner_and_member_workspaces(
-        self, domain_id: str, user_id: str, workspace_ids: list = None
-    ) -> Tuple:
-        workspace_member_workspaces = []
-        workspace_owner_workspaces = []
+    def get_role_bindings(
+        self, domain_id: str, user_id: str, workspaces: list = None
+    ) -> list:
         db_name, collection_name = self._get_collection_and_db_name(
             "identity.RoleBinding"
         )
 
         find_filter = {"domain_id": domain_id, "user_id": user_id}
-        if workspace_ids:
-            find_filter["workspace_id"] = {"$in": workspace_ids}
+        if workspaces:
+            find_filter["workspace_id"] = {"$in": workspaces + ["*"]}
 
         results = list(self.client[db_name][collection_name].find(filter=find_filter))
-
-        for result in results:
-            if result["role_type"] == "WORKSPACE_OWNER":
-                workspace_owner_workspaces.append(result["workspace_id"])
-            elif result["role_type"] == "WORKSPACE_MEMBER":
-                workspace_member_workspaces.append(result["workspace_id"])
-        _LOGGER.debug(
-            f"[get_workspace_owner_and_member_workspaces] workspace_owner_workspaces: {workspace_owner_workspaces}, workspace_member_workspaces: {workspace_member_workspaces}"
-        )
-        return workspace_owner_workspaces, workspace_member_workspaces
+        return results
 
     def _get_collection_and_db_name(self, resource_type: str) -> Tuple[str, str]:
         service, resource = resource_type.split(".")
@@ -182,6 +184,26 @@ class ResourceManager(BaseManager):
             db_name = service
 
         return db_name, collection_name
+
+    @staticmethod
+    def get_workspace_owner_workspaces(role_bindings_info: list):
+        workspace_owner_workspaces = []
+        for role_binding_info in role_bindings_info:
+            if role_binding_info["role_type"] == "WORKSPACE_OWNER":
+                workspace_owner_workspaces.append(role_binding_info["workspace_id"])
+            elif role_binding_info["role_type"] == "DOMAIN_ADMIN":
+                return []
+        return workspace_owner_workspaces
+
+    @staticmethod
+    def get_workspace_member_workspaces(role_bindings_info: list):
+        workspace_member_workspaces = []
+        for role_binding_info in role_bindings_info:
+            if role_binding_info["role_type"] == "WORKSPACE_MEMBER":
+                workspace_member_workspaces.append(role_binding_info["workspace_id"])
+            elif role_binding_info["role_type"] == "DOMAIN_ADMIN":
+                return []
+        return workspace_member_workspaces
 
     @staticmethod
     def _get_dashboard_type(result: dict) -> str:
