@@ -16,6 +16,7 @@ RESOURCE_TYPES = {
                 {"data.account_id": "account"},
                 {"data.subscription_id": "account"},
                 {"data.project_id": "account"},
+                {"service_account_id": "account"},
             ],
         },
     },
