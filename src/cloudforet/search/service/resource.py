@@ -84,6 +84,8 @@ class ResourceService(BaseService):
                     workspaces = self._get_accessible_workspaces(
                         domain_id, role_type, workspaces, user_id
                     )
+                else:
+                    params.workspace_id = None
             else:
                 if all_workspaces or workspaces:
                     workspaces = self._get_accessible_workspaces(
