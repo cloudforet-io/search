@@ -11,7 +11,7 @@ RESOURCE_TYPES = {
         },
         "response": {
             "resource_id": "service_account_id",
-            "name": "{account} ({name})",
+            "name": "{name} ({account})",
             "aliases": [
                 {"data.account_id": "account"},
                 {"data.subscription_id": "account"},
@@ -46,7 +46,7 @@ RESOURCE_TYPES = {
     },
     "inventory.CloudService": {
         "request": {
-            "search": ["name", "ip_addresses", "account", "instance_type"],
+            "search": ["name", "ip_addresses", "account"],
             "filter": [{"state": "ACTIVE"}],
         },
         "response": {
