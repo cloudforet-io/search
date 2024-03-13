@@ -160,7 +160,11 @@ class ResourceManager(BaseManager):
         return project_group_map
 
     def get_role_bindings(
-        self, domain_id: str, user_id: str, workspaces: list = None
+        self,
+        domain_id: str,
+        user_id: str,
+        workspaces: list = None,
+        role_type: str = None,
     ) -> list:
         db_name, collection_name = self._get_collection_and_db_name(
             "identity.RoleBinding"
@@ -169,6 +173,8 @@ class ResourceManager(BaseManager):
         find_filter = {"domain_id": domain_id, "user_id": user_id}
         if workspaces:
             find_filter["workspace_id"] = {"$in": workspaces + ["*"]}
+        if role_type:
+            find_filter["role_type"] = role_type
 
         results = list(self.client[db_name][collection_name].find(filter=find_filter))
         return results

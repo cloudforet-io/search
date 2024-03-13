@@ -1,5 +1,6 @@
 import logging
 
+from spaceone.core import cache
 from spaceone.core import config
 from spaceone.core.auth.jwt.jwt_util import JWTUtil
 from spaceone.core.error import *
@@ -76,7 +77,9 @@ class ResourceService(BaseService):
             find_filter = decoded_next_token.get("find_filter")
             page = decoded_next_token.get("page")
         else:
-            if role_type == "DOMAIN_ADMIN":
+            user_role_type = self._get_user_role_type(domain_id, user_id)
+
+            if role_type == "DOMAIN_ADMIN" or user_role_type == "DOMAIN_ADMIN":
                 if workspaces:
                     workspaces = self._get_accessible_workspaces(
                         domain_id, role_type, workspaces, user_id
@@ -312,6 +315,22 @@ class ResourceService(BaseService):
             raise ERROR_PERMISSION_DENIED(reason="Invalid next_token.")
 
         return next_token
+
+    @cache.cacheable(key="search:user-role-type:{domain_id}:{user_id}", expire=10)
+    def _get_user_role_type(
+        self, domain_id: str, user_id: str = None
+    ) -> Union[str, None]:
+        user_role_type = None
+
+        if user_id:
+            role_bindings_info = self.resource_manager.get_role_bindings(
+                domain_id, user_id, role_type="DOMAIN_ADMIN"
+            )
+
+            if role_bindings_info:
+                user_role_type = role_bindings_info[0].get("role_type", "USER")
+
+        return user_role_type
 
     @staticmethod
     def _make_filter_by_workspaces(
