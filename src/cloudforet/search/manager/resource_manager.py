@@ -62,13 +62,13 @@ class ResourceManager(BaseManager):
         )
         return results
 
-    def list_workspaces(self, domain_id: str) -> list:
+    def list_workspaces(self, domain_id: str, state: str = "ENABLED") -> list:
         db_name, collection_name = self._get_collection_and_db_name(
             "identity.Workspace"
         )
         response = list(
             self.client[db_name][collection_name].find(
-                {"domain_id": domain_id, "state": "ENABLED"}
+                {"domain_id": domain_id, "state": state}
             )
         )
         return response

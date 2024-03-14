@@ -86,6 +86,10 @@ class ResourceService(BaseService):
                     )
                 else:
                     params.workspace_id = None
+                    deleted_workspaces = self._get_delete_workspaces(domain_id)
+                    find_filter["$and"].append(
+                        {"workspace_id": {"$nin": deleted_workspaces}}
+                    )
             else:
                 if all_workspaces or workspaces:
                     workspaces = self._get_accessible_workspaces(
@@ -235,6 +239,13 @@ class ResourceService(BaseService):
             workspaces = workspace_ids
 
         return workspaces
+
+    def _get_delete_workspaces(self, domain_id: str) -> list:
+        workspaces_info = self.resource_manager.list_workspaces(domain_id, "DELETED")
+        deleted_workspaces = [
+            workspace_info["workspace_id"] for workspace_info in workspaces_info
+        ]
+        return deleted_workspaces
 
     def _make_find_filter_by_resource_type(
         self, find_filter: dict, resource_type: str, regex_pattern: str
