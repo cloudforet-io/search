@@ -11,7 +11,7 @@ RESOURCE_TYPES = {
         },
         "response": {
             "resource_id": "service_account_id",
-            "name": "{name} ({account})",
+            "name": "{account} ({name})",
             "aliases": [
                 {"data.account_id": "account"},
                 {"data.subscription_id": "account"},
