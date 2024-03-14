@@ -62,15 +62,11 @@ class ResourceManager(BaseManager):
         )
         return results
 
-    def list_workspaces(self, domain_id: str, state: str = "ENABLED") -> list:
+    def list_workspaces(self, find_filter: dict) -> list:
         db_name, collection_name = self._get_collection_and_db_name(
             "identity.Workspace"
         )
-        response = list(
-            self.client[db_name][collection_name].find(
-                {"domain_id": domain_id, "state": state}
-            )
-        )
+        response = list(self.client[db_name][collection_name].find(filter=find_filter))
         return response
 
     def list_public_projects(self, domain_id: str, workspace_id: str) -> list:
