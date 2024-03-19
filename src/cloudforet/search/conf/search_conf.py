@@ -1,5 +1,3 @@
-# aliases are convert 'key' to 'value' name
-# tags are store 'key' at tags with result['value']
 RESOURCE_TYPES = {
     "identity.ServiceAccount": {
         "request": {
@@ -117,7 +115,7 @@ RESOURCE_TYPES = {
                 "provider": "provider",
                 "group": "cloud_service_group",
                 "name": "cloud_service_type",
-                "resource_id": "resource_id",
+                "resource_id": "ref_resource_id",
             },
         },
     },
