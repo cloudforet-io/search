@@ -1,3 +1,5 @@
+# aliases are convert 'key' to 'value' name
+# tags are store 'key' at tags with result['value']
 RESOURCE_TYPES = {
     "identity.ServiceAccount": {
         "request": {
@@ -7,17 +9,38 @@ RESOURCE_TYPES = {
                 "data.subscription_id",
                 "data.tenant_id",
                 "data.project_id",
-            ]
+            ],
+            "projection": {
+                "name": 1,
+                "data": 1,
+                "service_account_id": 1,
+                "domain_id": 1,
+                "workspace_id": 1,
+                "project_id": 1,
+                "account": {
+                    "$switch": {
+                        "branches": [
+                            {
+                                "case": {"$ifNull": ["$data.account_id", None]},
+                                "then": "$data.account_id",
+                            },
+                            {
+                                "case": {"$ifNull": ["$data.subscription_id", None]},
+                                "then": "$data.subscription_id",
+                            },
+                            {
+                                "case": {"$ifNull": ["$data.project_id", None]},
+                                "then": "$data.project_id",
+                            },
+                        ],
+                        "default": "$service_account_id",
+                    }
+                },
+            },
         },
         "response": {
             "resource_id": "service_account_id",
-            "name": "{account} ({name})",
-            "aliases": [
-                {"data.account_id": "account"},
-                {"data.subscription_id": "account"},
-                {"data.project_id": "account"},
-                {"service_account_id": "account"},
-            ],
+            "name": "{name} ({account})",
         },
     },
     "identity.Project": {
@@ -29,18 +52,26 @@ RESOURCE_TYPES = {
         "response": {"resource_id": "workspace_id", "name": "{name}"},
     },
     "inventory.CloudServiceType": {
-        "request": {"search": ["name", "group", "provider"]},
+        "request": {
+            "search": ["name", "group", "provider"],
+            "projection": {
+                "group": 1,
+                "name": 1,
+                "provider": 1,
+                "cloud_service_type_id": 1,
+                "workspace_id": 1,
+                "domain_id": 1,
+                "icon": "$tags.spaceone:icon",
+            },
+        },
         "response": {
             "resource_id": "cloud_service_type_id",
             "name": "{group} > {name}",
-            "aliases": [
-                {"tags.spaceone:icon": "icon"},
-            ],
             "tags": {
-                "provider": "{provider}",
-                "icon": "{icon}",
-                "group": "{group}",
-                "name": "{name}",
+                "provider": "provider",
+                "icon": "icon",
+                "group": "group",
+                "name": "name",
             },
         },
     },
@@ -48,11 +79,46 @@ RESOURCE_TYPES = {
         "request": {
             "search": ["name", "ip_addresses", "account"],
             "filter": [{"state": "ACTIVE"}],
+            "projection": {
+                "cloud_service_id": 1,
+                "cloud_service_type": 1,
+                "cloud_service_group": 1,
+                "name": 1,
+                "provider": 1,
+                "ip_addresses": {
+                    "$reduce": {
+                        "input": "$ip_addresses",
+                        "initialValue": "",
+                        "in": {"$concat": ["$$value", "$$this", ","]},
+                    }
+                },
+                "project_id": 1,
+                "workspace_id": 1,
+                "domain_id": 1,
+                "ref_resource_id": "$reference.resource_id",
+                "cloud_service_type_key": {
+                    "$concat": [
+                        "$provider",
+                        ":",
+                        "$cloud_service_type",
+                        ":",
+                        "$cloud_service_group",
+                    ]
+                },
+            },
         },
         "response": {
             "resource_id": "cloud_service_id",
-            "name": "{name}",
+            "name": "{name}({ip_addresses})({ref_resource_id})",
             "description": "{cloud_service_group} > {cloud_service_type}",
+            "tags": {
+                "cloud_service_type_key": "cloud_service_type_key",
+                "ip_addresses": "ip_addresses",
+                "provider": "provider",
+                "group": "cloud_service_group",
+                "name": "cloud_service_type",
+                "resource_id": "resource_id",
+            },
         },
     },
     "dashboard.PublicDashboard": {

@@ -21,6 +21,7 @@ class ResourceManager(BaseManager):
         self,
         domain_id: str,
         find_filter: dict,
+        projection: dict,
         resource_type: str,
         limit: int,
         page: int,
@@ -30,7 +31,7 @@ class ResourceManager(BaseManager):
 
         results = list(
             self.client[db_name][collection_name].find(
-                filter=find_filter, limit=limit, skip=skip_count
+                filter=find_filter, projection=projection, limit=limit, skip=skip_count
             )
         )
 

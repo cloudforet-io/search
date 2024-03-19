@@ -8,6 +8,7 @@ from spaceone.core.service import *
 from spaceone.core.service.utils import *
 from spaceone.core.utils import *
 
+from cloudforet.search.lib.utils import *
 from cloudforet.search.manager.resource_manager import ResourceManager
 from cloudforet.search.manager.identity_manager import IdentityManager
 from cloudforet.search.model.resource.response import *
@@ -146,8 +147,9 @@ class ResourceService(BaseService):
             )
 
         # search resources
+        projection = self.search_conf[resource_type]["request"].get("projection", {})
         results = self.resource_manager.search_resource(
-            domain_id, find_filter, resource_type, limit, page
+            domain_id, find_filter, projection, resource_type, limit, page
         )
 
         next_token = self._encode_next_token_base64(
@@ -280,8 +282,6 @@ class ResourceService(BaseService):
             # Make description at response
             if description_format:
                 result["description"] = description_format.format(**result)
-            if aliases:
-                result = self._convert_result_by_alias(result, aliases)
             if tags:
                 result = self._add_additional_info_to_tags(result, tags)
             else:
@@ -400,14 +400,15 @@ class ResourceService(BaseService):
             for target_field, alias_name in alias.items():
                 if value := get_dict_value(result, target_field):
                     if not result.get(alias_name):
-                        result[alias_name] = value
+                        result[alias_name] = value.format(**result)
+                        # result = save_to_dict_value(result, alias_name, value)
         return result
 
     @staticmethod
     def _add_additional_info_to_tags(result: dict, tags: dict) -> dict:
         response_tags = {}
         for key, value in tags.items():
-            if target_value := get_dict_value(result, key):
+            if target_value := get_dict_value(result, value):
                 response_tags[key] = target_value
         result["tags"] = response_tags
         return result
