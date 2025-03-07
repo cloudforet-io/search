@@ -18,19 +18,30 @@ class SpaceONEPymongoClient:
                 "PYMONGO_DATABASES", config.get_global("DATABASES")
             )
 
-            if _db_prefix := cls.config.get("default").get("db_prefix"):
-                cls.prefix = cls.config.get("db_prefix")
-            elif _db_prefix := config.get_global("DATABASE_NAME_PREFIX"):
-                cls.prefix = _db_prefix
+            cls.prefix = cls.config.get("default").get(
+                "db_prefix"
+            ) or config.get_global("DATABASE_NAME_PREFIX")
 
             default_db_conf = cls.config.get("default")
             username = default_db_conf.get("username")
             password = default_db_conf.get("password")
-            protocol, host = default_db_conf.get("host").split("://")
+            host = default_db_conf.get("host")
+            port = default_db_conf.get("port")
 
-            cls._client = MongoClient(f"{protocol}://{username}:{password}@{host}")
+            if not host.startswith("mongodb://") and not host.startswith(
+                "mongodb+srv://"
+            ):
+                protocol = "mongodb"
+            else:
+                protocol, host = host.split("://")
 
-            _LOGGER.debug(f"[__new__] Create pymongo client prefix: {cls.prefix}")
+            cls._client = MongoClient(
+                f"{protocol}://{username}:{password}@{host}", port=port
+            )
+
+            _LOGGER.debug(
+                f"[__new__] Create pymongo client prefix: {cls.prefix}, protocol: {protocol})"
+            )
         return cls._client
 
     @classmethod

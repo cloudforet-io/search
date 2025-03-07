@@ -276,7 +276,6 @@ class ResourceService(BaseService):
     ) -> dict:
         name_format = response_conf["name"]
         description_format = response_conf.get("description")
-        aliases: list = response_conf.get("aliases")
         tags: dict = response_conf.get("tags")
         for result in results:
             # Make description at response
