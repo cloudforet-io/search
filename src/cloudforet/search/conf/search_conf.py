@@ -95,20 +95,13 @@ RESOURCE_TYPES = {
                 "domain_id": 1,
                 "ref_resource_id": "$reference.resource_id",
                 "cloud_service_type_key": {
-                    "$concat": [
-                        "$provider",
-                        ":",
-                        "$cloud_service_type",
-                        ":",
-                        "$cloud_service_group",
-                    ]
+                    "$concat": ["$provider", ":", "$cloud_service_type", ":", "$cloud_service_group"]
                 },
             },
         },
         "response": {
             "resource_id": "cloud_service_id",
-            "name": "{name}({ip_addresses})({ref_resource_id})",
-            "description": "{cloud_service_group} > {cloud_service_type}",
+            "name": "[{cloud_service_group} > {cloud_service_type}] {ref_resource_id} - {name}({ip_addresses})",
             "tags": {
                 "cloud_service_type_key": "cloud_service_type_key",
                 "ip_addresses": "ip_addresses",
