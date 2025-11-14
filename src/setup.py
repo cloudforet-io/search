@@ -17,7 +17,7 @@ import os
 from setuptools import setup, find_packages
 
 setup(
-    name="cloudforet-search",
+    name="cloudforet_search",
     version=os.environ.get("PACKAGE_VERSION"),
     description="Cloudforet search service",
     long_description="",
